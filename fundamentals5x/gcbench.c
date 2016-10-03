@@ -7,8 +7,8 @@
 #include <sys/resource.h>
 #include <getopt.h>
 
-static unsigned n = 1000000;
-static unsigned k = 2048;
+static unsigned n = 200000;
+static unsigned k = 4096;
 
 static void benchmark(void) {
     char** chunks = (char**) m61_malloc(sizeof(char*) * k);
@@ -17,7 +17,7 @@ static void benchmark(void) {
 
     // `n` chunk allocations of 1-4K each
     for (unsigned i = 0; i != n; ++i) {
-        if (i % 100000 == 0 && i != 0)
+        if (i % 10000 == 0 && i != 0)
             printf("Chunk allocation %u/%u\n", i, n);
         unsigned s = random() % k;
         // modify chunk, so valgrind will complain if the memory is free
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
     }
 
     benchmark();
-
+    printf("There is a test point");
     m61_gc();
     // this should print "0 allocations" or some other small number
     m61_print_allocations();

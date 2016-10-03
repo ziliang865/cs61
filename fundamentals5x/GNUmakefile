@@ -1,4 +1,4 @@
-PROGRAMS = nogcbench gcbench
+PROGRAMS =  gcbench
 all: $(PROGRAMS)
 
 # More garbage gets cleaned up more reliably when optimization is off.
@@ -9,8 +9,7 @@ include ../common/rules.mk
 %.o: %.c $(BUILDSTAMP)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPCFLAGS) $(O) -o $@ -c $<
 
-nogcbench: nogcbench.o m61gc.o
-	$(CC) $(CFLAGS) $(O) -o $@ $^
+
 
 gcbench: gcbench.o m61gc.o
 	$(CC) $(CFLAGS) $(O) -o $@ $^

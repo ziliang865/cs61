@@ -10,6 +10,8 @@
 // allocation containing a pointer, using binary search.
 
 // structure representing a single allocation
+#define GET_ARRAY_LEN(array,len) {len = (sizeof(array) / sizeof(array[0]) );}
+
 typedef struct allocation {
     char* ptr;                        // pointer to first allocated byte
     size_t sz;                        // size of allocation
@@ -22,22 +24,34 @@ static size_t allocs_capacity = 0;    // capacity of `allocs` array
 
 char* m61_stack_bottom;
 
-/// find_allocation_index(ptr)
-///    Return the index in the `allocs` array where `ptr` belongs.
-///    Uses binary search for speed.
-static size_t find_allocation_index(char* ptr);
 
-/// find_allocation(ptr)
-///    Return a pointer to the active allocation containing `ptr`, or
-///    NULL if no active allocation contains `ptr`.
-static allocation* find_allocation(char* ptr);
-
-/// allocation_atexit()
-///    Used to clean up the `allocs` array.
 static void allocation_atexit(void) {
     free(allocs);
 }
 
+static size_t find_allocation_index(char* ptr) {
+    size_t l = 0, r = nallocs;
+    while (l < r) {
+        size_t m = l + (r - l) / 2;
+        if (ptr < allocs[m].ptr)
+            r = m;
+        else if (ptr >= allocs[m].ptr + allocs[m].sz)
+            l = m + 1;
+        else
+            return m;
+    }
+    return l;
+}
+
+static allocation* find_allocation(char* ptr) __attribute__((used));
+static allocation* find_allocation(char* ptr) {
+    size_t i = find_allocation_index(ptr);
+    assert(i == nallocs || ptr < allocs[i].ptr + allocs[i].sz);
+    if (i < nallocs && ptr >= allocs[i].ptr)
+        return &allocs[i];
+    else
+        return NULL;
+}
 
 void* m61_malloc(size_t sz) {
     static size_t allocation_count = 0;
@@ -77,35 +91,51 @@ void* m61_malloc(size_t sz) {
 }
 
 void m61_free(void* ptr) {
-    if (!ptr)
-        return;
-    // find index of this allocation
-    size_t i = find_allocation_index(ptr);
-    // that allocation must match `ptr` exactly
-    assert(i < nallocs && allocs[i].ptr == ptr);
-    // remove the allocation from the list and free `ptr`
-    memmove(&allocs[i], &allocs[i + 1], sizeof(allocation) * (nallocs - i - 1));
-    --nallocs;
-    free(ptr);
-}
+	    if (!ptr)
+	        return;
+	    // find index of this allocation
+	    size_t i = find_allocation_index(ptr);
+	    // that allocation must match `ptr` exactly
+	    if(i>=nallocs)
+	    {
+	    	printf("the index is %u, nallocs is %u  and the address is %p",i,nallocs,ptr);
+	    }
+	    assert(i <nallocs);
+	    assert(allocs[i].ptr == ptr);
+	    // remove the allocation from the list and free `ptr`
+	    memmove(&allocs[i], &allocs[i + 1], sizeof(allocation) * (nallocs - i - 1));
+	    --nallocs;
+	    free(ptr);
 
+}
 void m61_print_allocations(void) {
     printf("%zu allocations\n", nallocs);
     for (size_t i = 0; i != nallocs; ++i)
         printf("  #%zu: %p: %zu bytes\n", i, allocs[i].ptr, allocs[i].sz);
 }
-
+static unsigned n_marked=0;
 static void mark_allocations(const char* base, size_t sz) {
     (void) base;
     if (sz < sizeof(void*))
         return;
+    n_marked++;
     for (size_t i = 0; i <= sz - sizeof(void*); ++i) {
+    	char *ptr;
+    	memcpy(&ptr,base+i,sizeof(ptr));
+    	allocation * ptr_allocs=find_allocation(ptr);
+    	if(ptr_allocs&&ptr_allocs->marked==0)
+    	{
+    		ptr_allocs->marked=1;
+    		mark_allocations(ptr_allocs->ptr,ptr_allocs->sz);
+    	}
         // check if the data at `base + i` contains a pointer
         // YOUR CODE HERE
+
     }
 }
 
 void m61_gc(void) {
+
 #if __x86_64__
     // ensure all of our callers' variables are located on the stack,
     // rather than in registers
@@ -115,7 +145,12 @@ void m61_gc(void) {
     char* stack_top = (char*) &stack_top;
 
     // unmark all active allocations
-    // YOUR CODE HERE
+    // YOUR CODE HEREo
+	for(size_t i=0;i!=nallocs;i++)
+	{
+		allocs[i].marked=0;
+
+	}
 
     // mark allocations in the stack
     mark_allocations(stack_top, m61_stack_bottom - stack_top);
@@ -126,35 +161,30 @@ void m61_gc(void) {
     extern char _end[];
     mark_allocations(data_start, _end - data_start);
 #endif
+    for(size_t i=0;i!=nallocs;i++)
+    	{
+			if(!allocs[i].marked)
+			{
+				size_t index=find_allocation_index(allocs[i].ptr);
+				if(index!=i)
+				{
+					printf("i is %u,index is %u",i,index);
+					assert(index==i);
 
+				}
+
+				m61_free(allocs[i].ptr);
+			}
+
+    	}
     // free unmarked allocations
     // YOUR CODE HERE
+
+
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Helper method definitions
 
-static size_t find_allocation_index(char* ptr) {
-    size_t l = 0, r = nallocs;
-    while (l < r) {
-        size_t m = l + (r - l) / 2;
-        if (ptr < allocs[m].ptr)
-            r = m;
-        else if (ptr >= allocs[m].ptr + allocs[m].sz)
-            l = m + 1;
-        else
-            return m;
-    }
-    return l;
-}
 
-static allocation* find_allocation(char* ptr) __attribute__((used));
-static allocation* find_allocation(char* ptr) {
-    size_t i = find_allocation_index(ptr);
-    assert(i == nallocs || ptr < allocs[i].ptr + allocs[i].sz);
-    if (i < nallocs && ptr >= allocs[i].ptr)
-        return &allocs[i];
-    else
-        return NULL;
-}
